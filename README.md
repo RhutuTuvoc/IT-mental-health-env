@@ -1,3 +1,22 @@
+---
+title: IT Mental Health OpenEnv
+emoji: 🧠
+colorFrom: blue
+colorTo: purple
+sdk: docker
+app_port: 7860
+pinned: false
+license: mit
+short_description: OpenEnv RL benchmark for burnout detection, triage & intervention planning in IT teams.
+tags:
+  - openenv
+  - reinforcement-learning
+  - benchmark
+  - mental-health
+  - llm-evaluation
+  - hackathon
+---
+
 # IT Mental Health OpenEnv
 
 An OpenEnv-compatible reinforcement learning environment for mental health assessment and intervention planning in the IT and software engineering sector.
