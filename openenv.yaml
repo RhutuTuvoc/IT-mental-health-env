@@ -1,0 +1,68 @@
+spec_version: 1
+
+name: it_mental_health_env
+version: "1.0.0"
+description: >
+  An RL environment for mental health assessment and intervention planning
+  in the IT/software engineering sector. An AI agent faces three progressively
+  harder scenarios: detecting burnout signals (easy), triaging employee stress
+  cases (medium), and designing a structured team-wide intervention plan (hard).
+  Reward is 0.0–1.0 per task based on rubric coverage, structured format, and
+  clinical accuracy.
+
+type: typed          # uses typed Action / Observation / State models
+
+runtime:
+  language: python
+  version: "3.11"
+
+app:
+  module: app
+  object: app
+
+port: 7860
+
+tasks:
+  - id: burnout_detection
+    difficulty: easy
+    description: Identify Maslach burnout dimensions and severity from an employee profile
+    reward_range: [0.0, 1.0]
+
+  - id: stress_triage
+    difficulty: medium
+    description: Triage 3 IT employees by stress tier and recommend immediate actions
+    reward_range: [0.0, 1.0]
+
+  - id: intervention_plan
+    difficulty: hard
+    description: Design a 4-week mental health intervention plan for a burned-out IT team
+    reward_range: [0.0, 1.0]
+
+action_space:
+  type: text
+  fields:
+    response: str
+    task_id: str
+    confidence: float
+    metadata: dict
+
+observation_space:
+  type: text
+  fields:
+    scenario: str
+    feedback: str
+    reward: float
+    done: bool
+    score_breakdown: dict
+    task_id: str
+
+endpoints:
+  reset: POST /reset
+  step:  POST /step
+  state: GET  /state
+  health: GET /health
+  tasks: GET  /tasks
+  schema: GET /schema
+
+author: "IT Mental Health OpenEnv — Scaler x Meta-PyTorch Hackathon 2026"
+license: MIT
