@@ -20,5 +20,8 @@ dependencies = [
     "huggingface_hub"
 ]
 
-[tool.setuptools]
-py-modules = ["app", "inference", "it_mental_health_environment", "models", "validate"]
+[project.scripts]
+server = "server.app:main"
+
+[tool.setuptools.packages.find]
+where = ["."]

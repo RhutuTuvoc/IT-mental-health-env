@@ -3,21 +3,20 @@ spec_version: 1
 name: it_mental_health_env
 version: "1.0.0"
 description: >
-  An RL environment for mental health assessment and intervention planning
-  in the IT/software engineering sector. An AI agent faces three progressively
-  harder scenarios: detecting burnout signals (easy), triaging employee stress
-  cases (medium), and designing a structured team-wide intervention plan (hard).
-  Reward is 0.0–1.0 per task based on rubric coverage, structured format, and
-  clinical accuracy.
+  A reinforcement learning environment for mental health assessment and
+  intervention planning in IT and software engineering teams. Agents solve
+  three progressively harder tasks: burnout detection, stress triage, and
+  team-level intervention planning. Each task returns a normalized reward in
+  the 0.0-1.0 range based on rubric coverage, structure, and clinical accuracy.
 
-type: typed          # uses typed Action / Observation / State models
+type: typed
 
 runtime:
   language: python
   version: "3.11"
 
 app:
-  module: app
+  module: server.app
   object: app
 
 port: 7860
@@ -58,11 +57,11 @@ observation_space:
 
 endpoints:
   reset: POST /reset
-  step:  POST /step
-  state: GET  /state
+  step: POST /step
+  state: GET /state
   health: GET /health
-  tasks: GET  /tasks
+  tasks: GET /tasks
   schema: GET /schema
 
-author: "IT Mental Health OpenEnv — Scaler x Meta-PyTorch Hackathon 2026"
+author: "IT Mental Health OpenEnv - Scaler x Meta-PyTorch Hackathon 2026"
 license: MIT

@@ -389,6 +389,9 @@ class ITMentalHealthEnvironment:
         )
 
     def step(self, action):
+        if not self._state.episode_id or not self._current_scenarios:
+            raise ValueError("Episode not initialized. Call /reset before /step.")
+
         # Guard: refuse to grade once the episode is finished.
         if self._task_index >= len(TASK_ORDER):
             return MentalHealthObservation(
@@ -400,6 +403,8 @@ class ITMentalHealthEnvironment:
 
         self._state.step_count += 1
         task = self._state.current_task
+        if action.task_id != task:
+            raise ValueError(f"task_id mismatch: expected '{task}', got '{action.task_id}'.")
         scenario_text, ground_truth = self._current_scenarios.get(task, ("", {}))
 
         reward, breakdown, feedback = _llm_judge_grade(
