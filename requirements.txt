@@ -5,3 +5,4 @@ pydantic
 requests
 PyYAML
 openai
+huggingface_hub
