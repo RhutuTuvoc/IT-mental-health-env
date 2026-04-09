@@ -1,14 +1,16 @@
 [build-system]
-requires = ["setuptools>=61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["setuptools>=68", "wheel"]
+build-backend = "setuptools.backends.legacy:build"
 
 [project]
 name = "it-mental-health-env"
 version = "1.0.0"
 description = "RL benchmark for IT team burnout detection and triage."
 readme = "README.md"
+license = { text = "MIT" }
 requires-python = ">=3.9"
 dependencies = [
+    "openenv-core>=0.1.0",
     "fastapi",
     "uvicorn",
     "pydantic",
@@ -16,3 +18,6 @@ dependencies = [
     "PyYAML",
     "openai"
 ]
+
+[tool.setuptools]
+py-modules = ["app", "inference", "it_mental_health_environment", "models", "validate"]
