@@ -7,7 +7,7 @@ sdk: docker
 app_port: 7860
 pinned: false
 license: mit
-short_description: OpenEnv RL benchmark for burnout detection, triage & intervention planning in IT teams.
+short_description: RL benchmark for IT team burnout detection and triage.
 tags:
   - openenv
   - reinforcement-learning
