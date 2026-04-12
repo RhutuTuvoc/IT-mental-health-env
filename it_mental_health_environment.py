@@ -13,24 +13,32 @@ from typing import Optional
 from openai import OpenAI
 
 try:
-    from models import MentalHealthAction, MentalHealthObservation, MentalHealthState
+    from models import MentalHealthAction, MentalHealthObservation, MentalHealthReward, MentalHealthState
 except ImportError:
     try:
-        from server.models import MentalHealthAction, MentalHealthObservation, MentalHealthState
+        from server.models import MentalHealthAction, MentalHealthObservation, MentalHealthReward, MentalHealthState
     except ImportError:
         import sys
         sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-        from models import MentalHealthAction, MentalHealthObservation, MentalHealthState
+        from models import MentalHealthAction, MentalHealthObservation, MentalHealthReward, MentalHealthState
 
 TASK_ORDER = ["burnout_detection", "stress_triage", "intervention_plan"]
+TASK_DIFFICULTY = {
+    "burnout_detection": "easy",
+    "stress_triage": "medium",
+    "intervention_plan": "hard",
+}
 
 # ── LLM Judge client ──────────────────────────────────────────────────────────
 _llm_client: Optional[OpenAI] = None
 
 def _get_llm_client() -> Optional[OpenAI]:
     global _llm_client
+    use_llm_judge = os.environ.get("USE_LLM_JUDGE", "").strip().lower() in {"1", "true", "yes"}
+    if not use_llm_judge:
+        return None
     if _llm_client is None:
-        api_key = os.environ.get("HF_TOKEN", "")
+        api_key = os.environ.get("HF_TOKEN", "") or os.environ.get("OPENAI_API_KEY", "")
         base_url = os.environ.get("API_BASE_URL", "https://api-inference.huggingface.co/v1")
         if api_key:
             _llm_client = OpenAI(api_key=api_key, base_url=base_url)
@@ -371,6 +379,22 @@ class ITMentalHealthEnvironment:
             "intervention_plan": generate_intervention_plan_scenario(self._rng),
         }
 
+    def _score_metadata(self, task: str, reward: float):
+        difficulty = TASK_DIFFICULTY[task]
+        task_step_count = self._state.task_step_counts.get(task, 0) + 1
+        task_cumulative_score = round(self._state.task_scores.get(task, 0.0) + reward, 3)
+        difficulty_cumulative_score = round(
+            self._state.difficulty_scores.get(difficulty, 0.0) + reward, 3
+        )
+        return {
+            "difficulty": difficulty,
+            "step_score": round(reward, 3),
+            "task_step_number": task_step_count,
+            "task_cumulative_score": task_cumulative_score,
+            "difficulty_cumulative_score": difficulty_cumulative_score,
+            "overall_cumulative_score": round(self._state.cumulative_reward + reward, 3),
+        }
+
     def reset(self, seed=None):
         actual_seed = seed if seed is not None else random.randint(0, 2**31)
         self._rng = random.Random(actual_seed)
@@ -379,13 +403,24 @@ class ITMentalHealthEnvironment:
         self._state = MentalHealthState(
             episode_id=str(uuid.uuid4()), step_count=0,
             current_task=TASK_ORDER[0], cumulative_reward=0.0, tasks_completed=[],
+            task_scores={task_id: 0.0 for task_id in TASK_ORDER},
+            task_step_counts={task_id: 0 for task_id in TASK_ORDER},
+            difficulty_scores={"easy": 0.0, "medium": 0.0, "hard": 0.0},
         )
         task = TASK_ORDER[0]
         scenario_text, _ = self._current_scenarios[task]
         return MentalHealthObservation(
             scenario=scenario_text, feedback=f"New episode (seed={actual_seed}).",
-            reward=0.0, done=False, score_breakdown={}, task_id=task,
-            metadata={"seed": actual_seed},
+            task_id=task,
+            metadata={
+                "seed": actual_seed,
+                "difficulty": TASK_DIFFICULTY[task],
+                "step_score": 0.0,
+                "task_step_number": 0,
+                "task_cumulative_score": 0.0,
+                "difficulty_cumulative_score": 0.0,
+                "overall_cumulative_score": 0.0,
+            },
         )
 
     def step(self, action):
@@ -394,12 +429,13 @@ class ITMentalHealthEnvironment:
 
         # Guard: refuse to grade once the episode is finished.
         if self._task_index >= len(TASK_ORDER):
-            return MentalHealthObservation(
+            observation = MentalHealthObservation(
                 scenario="Episode already finished. Call /reset to start a new one.",
                 feedback="No-op: episode is done.",
-                reward=0.0, done=True, score_breakdown={},
                 task_id=self._state.current_task,
             )
+            reward = MentalHealthReward(value=0.0, score_breakdown={}, feedback="No-op: episode is done.")
+            return observation, reward, True, {}
 
         self._state.step_count += 1
         task = self._state.current_task
@@ -411,7 +447,11 @@ class ITMentalHealthEnvironment:
             task_id=task, scenario=scenario_text,
             response=action.response, ground_truth=ground_truth,
         )
+        score_metadata = self._score_metadata(task, reward)
         self._state.cumulative_reward += reward
+        self._state.task_scores[task] = score_metadata["task_cumulative_score"]
+        self._state.task_step_counts[task] = score_metadata["task_step_number"]
+        self._state.difficulty_scores[TASK_DIFFICULTY[task]] = score_metadata["difficulty_cumulative_score"]
         self._state.tasks_completed.append(task)
 
         self._task_index += 1
@@ -425,11 +465,18 @@ class ITMentalHealthEnvironment:
             self._state.current_task = next_task
             next_scenario, _ = self._current_scenarios[next_task]
 
-        return MentalHealthObservation(
-            scenario=next_scenario, feedback=feedback,
-            reward=reward, done=done, score_breakdown=breakdown, task_id=next_task,
+        observation = MentalHealthObservation(
+            scenario=next_scenario,
+            feedback=feedback,
+            task_id=next_task,
+            metadata=score_metadata,
         )
+        reward_model = MentalHealthReward(
+            value=reward,
+            score_breakdown=breakdown,
+            feedback=feedback,
+        )
+        return observation, reward_model, done, score_metadata
 
-    @property
     def state(self):
         return self._state

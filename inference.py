@@ -23,7 +23,7 @@ from openai import OpenAI
 
 API_BASE_URL = os.getenv("API_BASE_URL", "https://api-inference.huggingface.co/v1")
 MODEL_NAME = os.getenv("MODEL_NAME", "meta-llama/Llama-3.1-8B-Instruct")
-HF_TOKEN = os.getenv("HF_TOKEN")
+HF_TOKEN = os.getenv("HF_TOKEN") or os.getenv("OPENAI_API_KEY")
 LOCAL_IMAGE_NAME = os.getenv("LOCAL_IMAGE_NAME")
 ENV_BASE_URL = os.getenv("ENV_BASE_URL", "http://localhost:7860")
 
@@ -70,12 +70,14 @@ def log_end(success: bool, steps: int, score: float, rewards: List[float]) -> No
     )
 
 
-def call_env(endpoint: str, payload: Optional[dict] = None, method: str = "POST") -> dict:
+def call_env(
+    http: requests.Session, endpoint: str, payload: Optional[dict] = None, method: str = "POST"
+) -> dict:
     url = f"{ENV_BASE_URL}/{endpoint}"
     if method == "GET":
-        response = requests.get(url, timeout=30)
+        response = http.get(url, timeout=30)
     else:
-        response = requests.post(url, json=payload or {}, timeout=30)
+        response = http.post(url, json=payload or {}, timeout=30)
     response.raise_for_status()
     return response.json()
 
@@ -105,11 +107,13 @@ def main() -> None:
 
     try:
         if not HF_TOKEN:
-            raise RuntimeError("HF_TOKEN must be set for inference.")
+            raise RuntimeError("HF_TOKEN or OPENAI_API_KEY must be set for inference.")
 
         client = OpenAI(base_url=API_BASE_URL, api_key=HF_TOKEN)
-        observation = call_env("reset", {})
+        http = requests.Session()
+        observation = call_env(http, "reset", {})
         current_task = observation.get("task_id", "unknown")
+        session_id = observation.get("metadata", {}).get("session_id")
         log_start(task=current_task, env=BENCHMARK, model=MODEL_NAME)
         start_logged = True
 
@@ -118,22 +122,31 @@ def main() -> None:
                 break
 
             current_task = observation.get("task_id", "unknown")
-            action_text = get_model_response(client, observation["scenario"])
+            scenario = observation.get("scenario")
+            if not scenario:
+                raise RuntimeError("Environment response missing 'scenario'.")
+
+            action_text = get_model_response(client, scenario)
 
             error = None
             done = False
             reward = 0.0
 
             try:
+                metadata = {}
+                if session_id:
+                    metadata["session_id"] = session_id
                 observation = call_env(
+                    http,
                     "step",
                     {
                         "response": action_text,
                         "task_id": current_task,
                         "confidence": 0.85,
-                        "metadata": {},
+                        "metadata": metadata,
                     },
                 )
+                session_id = observation.get("metadata", {}).get("session_id", session_id)
                 reward = float(observation.get("reward", 0.0) or 0.0)
                 done = bool(observation.get("done", False))
             except Exception as exc:

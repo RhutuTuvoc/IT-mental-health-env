@@ -13,7 +13,7 @@ from fastapi import FastAPI, Header, HTTPException, Query, Request, Response
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel, Field
 
-from it_mental_health_environment import ITMentalHealthEnvironment, TASK_ORDER
+from it_mental_health_environment import ITMentalHealthEnvironment, TASK_DIFFICULTY, TASK_ORDER
 from models import MentalHealthAction
 
 app = FastAPI(
@@ -106,6 +106,9 @@ class StateResponse(BaseModel):
     current_task: str
     cumulative_reward: float
     tasks_completed: list
+    task_scores: Dict[str, float]
+    task_step_counts: Dict[str, int]
+    difficulty_scores: Dict[str, float]
     session_id: str
 
 
@@ -175,9 +178,9 @@ def reset(
     return ObservationResponse(
         scenario=obs.scenario,
         feedback=obs.feedback,
-        reward=obs.reward,
-        done=obs.done,
-        score_breakdown=obs.score_breakdown,
+        reward=0.0,
+        done=False,
+        score_breakdown={},
         task_id=obs.task_id,
         metadata=_response_metadata(obs.metadata, session_id),
     )
@@ -202,17 +205,17 @@ def step(
         metadata=req.metadata or {},
     )
     try:
-        obs = env.step(action)
+        obs, reward_model, done, info = env.step(action)
     except ValueError as exc:
         raise HTTPException(status_code=400, detail=str(exc)) from exc
     return ObservationResponse(
         scenario=obs.scenario,
         feedback=obs.feedback,
-        reward=obs.reward,
-        done=obs.done,
-        score_breakdown=obs.score_breakdown,
+        reward=reward_model.value,
+        done=done,
+        score_breakdown=reward_model.score_breakdown,
         task_id=obs.task_id,
-        metadata=_response_metadata(obs.metadata, session_id),
+        metadata=_response_metadata(info or obs.metadata, session_id),
     )
 
 
@@ -228,13 +231,16 @@ def state(
         header_session_id=x_session_id,
     ) or ANONYMOUS_SESSION_ID
     env = session_store.get_or_create(resolved_session_id)
-    s = env.state
+    s = env.state()
     return StateResponse(
         episode_id=s.episode_id,
         step_count=s.step_count,
         current_task=s.current_task,
         cumulative_reward=s.cumulative_reward,
         tasks_completed=s.tasks_completed,
+        task_scores=s.task_scores,
+        task_step_counts=s.task_step_counts,
+        difficulty_scores=s.difficulty_scores,
         session_id=resolved_session_id,
     )
 
@@ -248,6 +254,11 @@ def list_tasks():
                 "task_id": tid,
                 "difficulty": TASK_METADATA[tid]["difficulty"],
                 "description": TASK_METADATA[tid]["description"],
+                "scoring": {
+                    "step_score": "score for the current graded step in this task",
+                    "task_cumulative_score": "sum of all step scores recorded for this task",
+                    "difficulty_cumulative_score": "sum of all step scores for this difficulty bucket",
+                },
             }
             for tid in TASK_ORDER
         ]
@@ -270,6 +281,19 @@ def schema():
             "done": "bool",
             "score_breakdown": "dict - partial scores per rubric dimension",
             "task_id": "str",
+            "metadata": {
+                "difficulty": "str - easy / medium / hard for the graded step",
+                "step_score": "float - score for this step",
+                "task_step_number": "int - graded step count within this task",
+                "task_cumulative_score": "float - cumulative score for this task",
+                "difficulty_cumulative_score": "float - cumulative score for this difficulty level",
+                "overall_cumulative_score": "float - episode-wide cumulative score",
+            },
+        },
+        "state": {
+            "task_scores": "dict - cumulative score per task_id",
+            "task_step_counts": "dict - graded step count per task_id",
+            "difficulty_scores": "dict - cumulative score per difficulty bucket",
         },
     }
 
