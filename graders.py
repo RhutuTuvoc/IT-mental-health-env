@@ -59,6 +59,62 @@ def _breakdown_to_reward(
     return _normalize_reward(weighted / total_weight)
 
 
+def _behavior_penalties(response: str) -> Tuple[float, Dict[str, float], List[str]]:
+    text = _safe_lower(response)
+    words = [word for word in text.split() if word]
+    unique_words = set(words)
+    penalties = 0.0
+    breakdown: Dict[str, float] = {}
+    reasons: List[str] = []
+
+    if len(words) < 20:
+        penalties += 0.15
+        breakdown["brevity_penalty"] = 0.15
+        reasons.append("response too short")
+
+    if words:
+        repetition_ratio = 1.0 - (len(unique_words) / max(len(words), 1))
+        if repetition_ratio > 0.55:
+            penalties += 0.15
+            breakdown["loop_penalty"] = 0.15
+            reasons.append("high repetition / loop-like output")
+
+    harmful_terms = [
+        "ignore instructions",
+        "delete",
+        "destroy",
+        "wipe",
+        "erase",
+        "punish",
+        "threaten",
+        "humiliate",
+        "fire them immediately",
+        "terminate employment immediately",
+        "do nothing",
+        "no action needed",
+    ]
+    harmful_hits = sum(1 for term in harmful_terms if term in text)
+    if harmful_hits:
+        harm_penalty = min(0.35, harmful_hits * 0.12)
+        penalties += harm_penalty
+        breakdown["harmful_behavior_penalty"] = round(harm_penalty, 3)
+        reasons.append("harmful or destructive recommendation")
+
+    return min(penalties, 0.6), breakdown, reasons
+
+
+def _apply_penalties(
+    reward: float, breakdown: Dict[str, float], response: str, feedback: str
+) -> GradeResult:
+    penalty_total, penalty_breakdown, reasons = _behavior_penalties(response)
+    breakdown = dict(breakdown)
+    breakdown.update(penalty_breakdown)
+    final_reward = _normalize_reward(reward - penalty_total)
+    if reasons:
+        feedback = f"{feedback} Penalties applied for: {', '.join(reasons)}."
+    return final_reward, breakdown, feedback
+
+
 def _burnout_grade(response: str, ground_truth: Dict[str, Any]) -> GradeResult:
     text = _safe_lower(response)
     dims = ground_truth.get("active_dimensions", [])
@@ -136,7 +192,7 @@ def _burnout_grade(response: str, ground_truth: Dict[str, Any]) -> GradeResult:
         f"Expected severity={ground_truth.get('severity')}; "
         f"dimension hits={dim_hits}/{max(len(dims), 1)}."
     )
-    return reward, breakdown, feedback
+    return _apply_penalties(reward, breakdown, response, feedback)
 
 
 def _stress_triage_grade(response: str, ground_truth: Dict[str, Any]) -> GradeResult:
@@ -179,7 +235,7 @@ def _stress_triage_grade(response: str, ground_truth: Dict[str, Any]) -> GradeRe
         f"[Deterministic Grader] stress_triage score={reward:.2f}. "
         f"Correct tier assignments={tier_hits}/{max(len(tiers), 1)}."
     )
-    return reward, breakdown, feedback
+    return _apply_penalties(reward, breakdown, response, feedback)
 
 
 def _intervention_plan_grade(response: str, ground_truth: Dict[str, Any]) -> GradeResult:
@@ -239,7 +295,7 @@ def _intervention_plan_grade(response: str, ground_truth: Dict[str, Any]) -> Gra
         f"[Deterministic Grader] intervention_plan score={reward:.2f}. "
         f"Week coverage={week_hits}/4."
     )
-    return reward, breakdown, feedback
+    return _apply_penalties(reward, breakdown, response, feedback)
 
 
 def grade_response(task_id: str, response: str, ground_truth: Dict[str, Any]) -> GradeResult:
