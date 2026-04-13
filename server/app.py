@@ -66,16 +66,19 @@ TASK_METADATA = {
     "burnout_detection": {
         "difficulty": "easy",
         "description": "Identify Maslach burnout dimensions, severity, red flags, and whether HR escalation is needed.",
+        "objective": "Assess one employee profile and determine burnout dimensions, severity, red flags, and escalation need.",
         "graders": ["burnout_detection_grader"],
     },
     "stress_triage": {
         "difficulty": "medium",
         "description": "Triage three IT employees by stress tier and recommend immediate and medium-term support.",
+        "objective": "Classify three employees by urgency, rank intervention priority, and recommend immediate plus 2-week support.",
         "graders": ["stress_triage_grader"],
     },
     "intervention_plan": {
         "difficulty": "hard",
         "description": "Design a four-week intervention plan for a software team facing systemic burnout.",
+        "objective": "Produce a four-week intervention plan with owners, measurable outcomes, KPIs, risk, and budget.",
         "graders": ["intervention_plan_grader"],
     },
 }
@@ -258,6 +261,7 @@ def list_tasks():
                 "id": tid,
                 "difficulty": TASK_METADATA[tid]["difficulty"],
                 "description": TASK_METADATA[tid]["description"],
+                "objective": TASK_METADATA[tid]["objective"],
                 "grader": TASK_METADATA[tid]["graders"][0],
                 "graders": TASK_METADATA[tid]["graders"],
                 "scoring": {

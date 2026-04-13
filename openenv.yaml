@@ -6,8 +6,8 @@ description: >
   A reinforcement learning environment for mental health assessment and
   intervention planning in IT and software engineering teams. Agents solve
   three progressively harder tasks: burnout detection, stress triage, and
-  team-level intervention planning. Each task returns a normalized reward in
-  the 0.0-1.0 range based on rubric coverage, structure, and clinical accuracy.
+  team-level intervention planning. Each task has a deterministic programmatic
+  grader and returns a normalized reward in the 0.0-1.0 range.
 
 type: typed
 
@@ -25,6 +25,7 @@ tasks:
   - id: burnout_detection
     difficulty: easy
     description: Identify Maslach burnout dimensions and severity from an employee profile
+    objective: Identify burnout dimensions, severity, top red flags, and HR escalation need from a single employee profile
     reward_range: [0.0, 1.0]
     grader: burnout_detection_grader
     graders:
@@ -33,6 +34,7 @@ tasks:
   - id: stress_triage
     difficulty: medium
     description: Triage 3 IT employees by stress tier and recommend immediate actions
+    objective: Classify three employee cases by urgency, rank intervention priority, and recommend immediate plus 2-week support
     reward_range: [0.0, 1.0]
     grader: stress_triage_grader
     graders:
@@ -41,6 +43,7 @@ tasks:
   - id: intervention_plan
     difficulty: hard
     description: Design a 4-week mental health intervention plan for a burned-out IT team
+    objective: Create a four-week intervention plan with owners, KPIs, risk, and budget for a burned-out software team
     reward_range: [0.0, 1.0]
     grader: intervention_plan_grader
     graders:
