@@ -26,16 +26,30 @@ tasks:
     difficulty: easy
     description: Identify Maslach burnout dimensions and severity from an employee profile
     reward_range: [0.0, 1.0]
+    grader: burnout_detection_grader
+    graders:
+      - burnout_detection_grader
 
   - id: stress_triage
     difficulty: medium
     description: Triage 3 IT employees by stress tier and recommend immediate actions
     reward_range: [0.0, 1.0]
+    grader: stress_triage_grader
+    graders:
+      - stress_triage_grader
 
   - id: intervention_plan
     difficulty: hard
     description: Design a 4-week mental health intervention plan for a burned-out IT team
     reward_range: [0.0, 1.0]
+    grader: intervention_plan_grader
+    graders:
+      - intervention_plan_grader
+
+graders:
+  module: graders
+  registry: GRADERS
+  task_grader_pairs: TASK_GRADER_PAIRS
 
 action_space:
   type: text

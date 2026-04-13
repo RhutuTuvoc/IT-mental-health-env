@@ -66,14 +66,17 @@ TASK_METADATA = {
     "burnout_detection": {
         "difficulty": "easy",
         "description": "Identify Maslach burnout dimensions, severity, red flags, and whether HR escalation is needed.",
+        "graders": ["burnout_detection_grader"],
     },
     "stress_triage": {
         "difficulty": "medium",
         "description": "Triage three IT employees by stress tier and recommend immediate and medium-term support.",
+        "graders": ["stress_triage_grader"],
     },
     "intervention_plan": {
         "difficulty": "hard",
         "description": "Design a four-week intervention plan for a software team facing systemic burnout.",
+        "graders": ["intervention_plan_grader"],
     },
 }
 
@@ -252,8 +255,11 @@ def list_tasks():
         "tasks": [
             {
                 "task_id": tid,
+                "id": tid,
                 "difficulty": TASK_METADATA[tid]["difficulty"],
                 "description": TASK_METADATA[tid]["description"],
+                "grader": TASK_METADATA[tid]["graders"][0],
+                "graders": TASK_METADATA[tid]["graders"],
                 "scoring": {
                     "step_score": "score for the current graded step in this task",
                     "task_cumulative_score": "sum of all step scores recorded for this task",
@@ -261,7 +267,18 @@ def list_tasks():
                 },
             }
             for tid in TASK_ORDER
-        ]
+        ],
+        "graders": {
+            "module": "graders",
+            "registry": "GRADERS",
+            "task_grader_pairs": [
+                {
+                    "task_id": tid,
+                    "grader": TASK_METADATA[tid]["graders"][0],
+                }
+                for tid in TASK_ORDER
+            ],
+        },
     }
 
 
